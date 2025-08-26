@@ -1,0 +1,24 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "mysql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model Taxonomy {
+  mId          Int       @id @default(autoincrement()) @map("m_id")
+  mType        String    @map("m_type")
+  mSlug        String    @unique @map("m_slug")
+  mName        String    @map("m_name")
+  mDescription String    @map("m_description") @db.Text
+  mCreatedAt   DateTime  @default(now()) @map("m_created_at")
+  mModifiedAt  DateTime? @updatedAt @map("m_modified_at")
+
+  @@unique([mType, mName])
+  @@index([mType])
+  @@index([mName])
+  @@map("taxonomy")
+}

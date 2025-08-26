@@ -1,0 +1,936 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["interactiveTransactions", "fullTextSearch", "fullTextIndex", "orderByNulls"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model announcement {
+  ID       Int      @id @default(autoincrement())
+  content  String   @db.MediumText
+  isSeen   Boolean
+  userID   Int
+  createAt DateTime @default(now()) @db.DateTime(0)
+}
+
+model author {
+  id           Int            @id @default(autoincrement())
+  name         String         @db.TinyText
+  description  String?        @db.Text
+  url          String?        @db.TinyText
+  ln_author    ln_author[]
+  manga_author manga_author[]
+
+  @@index([url(length: 255)], map: "IDX_author_url")
+}
+
+model blacklist {
+  id     Int  @id @default(autoincrement())
+  tagID  Int
+  userID Int
+  tag    tag  @relation(fields: [tagID], references: [id], onDelete: Cascade, map: "FK_blacklist_tag")
+  user   User @relation(fields: [id], references: [mId], onDelete: Cascade, map: "FK_blacklist_user")
+
+  @@index([tagID], map: "tagID")
+  @@index([userID], map: "userID")
+}
+
+model category {
+  ID          Int    @id @default(autoincrement())
+  name        String @db.MediumText
+  description String @db.MediumText
+}
+
+model chapter {
+  id                     Int                      @id @default(autoincrement())
+  name                   String                   @db.Text
+  date                   DateTime                 @default(now()) @db.DateTime(0)
+  view                   Int                      @default(0)
+  mangaID                Int
+  maxID                  Int                      @default(0)
+  likeCount              Int                      @default(0)
+  manga                  manga                    @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK_chapter_manga")
+  chapter_like           chapter_like[]
+  chapter_reaction_count chapter_reaction_count[]
+  comment                comment[]
+  history                history[]
+  temp_comment           temp_comment[]
+
+  @@index([mangaID], map: "FK_chapter_manga")
+}
+
+model chapter_like {
+  userID    Int
+  chapterID Int
+  type      String   @default("like") @db.TinyText
+  createAt  DateTime @default(now()) @db.DateTime(0)
+  user      User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_like_chapter_user")
+  chapter   chapter  @relation(fields: [chapterID], references: [id], onDelete: Cascade, map: "FK_like_user_chapter")
+
+  @@id([userID, chapterID])
+  @@index([chapterID, type(length: 7)], map: "IDX_chapter_reaction_type_count")
+}
+
+model chapter_reaction_count {
+  chapterID     Int
+  type          String  @db.VarChar(7)
+  reactionCount Int     @default(1)
+  chapter       chapter @relation(fields: [chapterID], references: [id], onDelete: Cascade, map: "FK_chapter_reaction_count")
+
+  @@id([chapterID, type])
+}
+
+model comment {
+  id                            Int                      @id @default(autoincrement())
+  mangaID                       Int
+  chapterID                     Int?
+  path                          String                   @default("/") @db.VarChar(256)
+  isHidden                      Boolean                  @default(false)
+  content                       String?                  @db.Text
+  replyID                       Int?
+  createAt                      DateTime                 @default(now()) @db.DateTime(0)
+  userID                        Int
+  image                         String?                  @db.TinyText
+  likeCount                     Int                      @default(0)
+  pinCreator                    Int?
+  pinCreateAt                   DateTime?                @db.DateTime(0)
+  replyCount                    Int                      @default(0)
+  isEdited                      Boolean                  @default(false)
+  mentionUser                   String                   @default("[]") @db.Text
+  manga                         manga                    @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK__comment_manga")
+  user_comment_pinCreatorTouser User?                    @relation("comment_pinCreatorTouser", fields: [pinCreator], references: [mId], onDelete: Cascade, map: "FK__comment_pin_creator")
+  user_comment_userIDTouser     User                     @relation("comment_userIDTouser", fields: [userID], references: [mId], onDelete: Cascade, map: "FK__comment_user")
+  chapter                       chapter?                 @relation(fields: [chapterID], references: [id], onDelete: Cascade, map: "comment_chapter_id_fk")
+  comment                       comment?                 @relation("commentTocomment", fields: [replyID], references: [id], onDelete: Cascade, map: "comment_comment_id_fk")
+  other_comment                 comment[]                @relation("commentTocomment")
+  comment_edit_history          comment_edit_history[]
+  comment_like                  comment_like[]
+  comment_reaction_count        comment_reaction_count[]
+
+  @@index([mangaID], map: "FK__comment_manga")
+  @@index([userID], map: "FK__comment_user")
+  @@index([chapterID], map: "chapterID")
+  @@index([createAt], map: "createAt")
+  @@index([pinCreator], map: "pinCreator")
+  @@index([replyID], map: "replyID")
+  @@fulltext([path], map: "IDX__comment_matPath")
+}
+
+model comment_edit_history {
+  commentId   Int
+  createdAt   DateTime @default(now()) @db.DateTime(0)
+  content     String   @db.Text
+  status      String?  @db.TinyText
+  image       String?  @db.TinyText
+  mentionUser String   @default("[]") @db.Text
+  comment     comment  @relation(fields: [commentId], references: [id], onDelete: Cascade, map: "table_name_comment_id_fk")
+
+  @@id([commentId, createdAt])
+}
+
+model comment_like {
+  userID    Int
+  commentID Int
+  type      String   @default("like") @db.TinyText
+  createAt  DateTime @default(now()) @db.DateTime(0)
+  user      User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_like_comment_user")
+  comment   comment  @relation(fields: [commentID], references: [id], onDelete: Cascade, map: "FK_like_user_comment")
+
+  @@id([userID, commentID])
+  @@index([commentID], map: "FK_like_user_comment")
+  @@fulltext([type], map: "IDX_comment_like_type")
+}
+
+model comment_reaction_count {
+  commentID     Int
+  type          String  @db.VarChar(7)
+  reactionCount Int     @default(1)
+  comment       comment @relation(fields: [commentID], references: [id], onDelete: Cascade, map: "FK_comment_reaction_count")
+
+  @@id([commentID, type])
+}
+
+model couple {
+  id           Int            @id @default(autoincrement())
+  name         String         @db.TinyText
+  url          String         @db.TinyText
+  description  String?        @db.Text
+  ln_couple    ln_couple[]
+  manga_couple manga_couple[]
+
+  @@index([url(length: 255)], map: "url")
+}
+
+model donate {
+  id         Int      @id @default(autoincrement())
+  userID     Int
+  type       String   @db.VarChar(50)
+  time       DateTime @db.DateTime(0)
+  money      Int
+  adminEmail String?  @db.VarChar(50)
+}
+
+model fanfic {
+  id          Int    @id @default(autoincrement())
+  name        String @db.TinyText
+  description String @db.Text
+  url         String @db.TinyText
+}
+
+model follow {
+  userID  Int
+  mangaID Int
+  manga   manga @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK_follow_manga")
+  user    User  @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_follow_user")
+
+  @@id([userID, mangaID])
+  @@index([mangaID], map: "FK_follow_manga")
+  @@index([userID], map: "userID")
+}
+
+model history {
+  userID    Int
+  mangaID   Int
+  chapterID Int
+  lastRead  DateTime @default(now()) @db.DateTime(0)
+  Name      String?  @db.Text
+  chapter   chapter  @relation(fields: [chapterID], references: [id], onDelete: Cascade, map: "history_chapter_id_fk")
+  manga     manga    @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "history_manga_id_fk")
+
+  @@id([userID, mangaID])
+  @@index([chapterID], map: "history_chapter_id_fk")
+  @@index([mangaID], map: "history_manga_id_fk")
+}
+
+model history_ln {
+  lnID      Int
+  chapterID Int
+  userID    Int
+  lastRead  DateTime @default(now()) @db.DateTime(0)
+  lchapter  lchapter @relation(fields: [chapterID], references: [id], onDelete: Cascade, map: "FK_chapter")
+  ln        ln       @relation(fields: [lnID], references: [id], onDelete: Cascade, map: "FK_history_ln")
+  user      User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_history_user")
+
+  @@id([lnID, userID])
+  @@index([userID], map: "FK_history_user")
+  @@index([lastRead], map: "IDX_history_lastRead")
+  @@index([chapterID], map: "chapterID")
+}
+
+model homepage_slide {
+  id  Int    @id @default(autoincrement())
+  pos Int
+  URL String @db.VarChar(50)
+}
+
+model host {
+  ID       Int    @id @default(autoincrement())
+  hostName String @db.MediumText
+  status   Int    @db.TinyInt
+}
+
+model lchapter {
+  id         Int          @id @default(autoincrement())
+  sequence   Int
+  lnID       Int
+  name       String       @db.Text
+  content    String       @db.MediumText
+  publish    Boolean
+  updateAt   DateTime     @default(now()) @db.DateTime(0)
+  view       Int          @default(0)
+  likeCount  Int          @default(0)
+  createAt   DateTime     @default(now()) @db.DateTime(0)
+  ln         ln           @relation(fields: [lnID], references: [id], onDelete: Cascade, map: "chapter_ln")
+  history_ln history_ln[]
+
+  @@unique([lnID, sequence], map: "sequence_2")
+  @@index([createAt], map: "createAt")
+  @@index([updateAt], map: "date")
+}
+
+model lchapter_like {
+  userID    Int
+  chapterID Int
+  createAt  DateTime @default(now()) @db.DateTime(0)
+
+  @@id([userID, chapterID])
+  @@index([chapterID], map: "FK_like_user_chapter")
+}
+
+model lcomment {
+  id        Int      @id @default(autoincrement())
+  lnID      Int
+  chapterID Int
+  content   String?  @db.Text
+  replyID   Int
+  createAt  DateTime @default(now()) @db.DateTime(0)
+  userID    Int
+  image     String?  @db.TinyText
+  likeCount Int      @default(0)
+  ln        ln       @relation(fields: [lnID], references: [id], onUpdate: Restrict, map: "FK_lcomment_ln")
+
+  @@index([userID], map: "FK_comment_user")
+  @@index([lnID], map: "FK_lcomment_ln")
+  @@index([chapterID], map: "chapterID")
+  @@index([createAt], map: "createAt")
+  @@index([replyID], map: "replyID")
+}
+
+model lcomment_like {
+  userID    Int
+  commentID Int
+  createAt  DateTime @default(now()) @db.DateTime(0)
+
+  @@id([userID, commentID])
+  @@index([commentID], map: "FK_like_user_comment")
+}
+
+model list {
+  userID  Int
+  mangaID Int
+  type    Int   @db.TinyInt
+  user    User  @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_list_manga_user")
+  manga   manga @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK_list_user_manga")
+
+  @@id([userID, mangaID])
+  @@index([mangaID], map: "FK_list_user_manga")
+}
+
+model ln {
+  id           Int            @id @default(autoincrement())
+  originalName String         @db.LongText
+  otherName    String         @db.LongText
+  releaseTime  DateTime       @default(now()) @db.DateTime(0)
+  description  String         @default("") @db.MediumText
+  status       Boolean        @default(true)
+  thumbnail    String?        @db.Text
+  type         String?        @db.VarChar(15)
+  lastUpdate   DateTime?      @default(now()) @db.DateTime(0)
+  weeklyView   Int            @default(0) @db.UnsignedInt
+  monthlyView  Int            @default(0) @db.UnsignedInt
+  dailyView    Int            @default(0) @db.UnsignedInt
+  totalFollow  Int            @default(0) @db.UnsignedInt
+  lastChapter  Int?
+  totalView    Int            @default(0) @db.UnsignedInt
+  totalChapter Int            @default(0)
+  likeCount    Int            @default(0) @db.UnsignedInt
+  followList   Int            @default(0) @db.UnsignedInt
+  doneList     Int            @default(0) @db.UnsignedInt
+  willList     Int            @default(0) @db.UnsignedInt
+  stopList     Int            @default(0) @db.UnsignedInt
+  history_ln   history_ln[]
+  lchapter     lchapter[]
+  lcomment     lcomment[]
+  ln_author    ln_author[]
+  ln_couple    ln_couple[]
+  ln_like      ln_like[]
+  ln_origin    ln_origin[]
+  ln_report    ln_report[]
+  ln_subscribe ln_subscribe[]
+  ln_tag       ln_tag[]
+  ln_team      ln_team[]
+  user_list_ln user_list_ln[]
+
+  @@index([dailyView], map: "dailyView")
+  @@index([followList], map: "followList")
+  @@index([lastUpdate], map: "lastUpdate")
+  @@index([likeCount], map: "likeCount")
+  @@index([monthlyView], map: "monthlyView")
+  @@index([doneList], map: "readList")
+  @@index([status], map: "status")
+  @@index([stopList], map: "stopList")
+  @@index([totalFollow], map: "totalFollow")
+  @@index([totalView], map: "totalView")
+  @@index([weeklyView], map: "weeklyView")
+  @@index([willList], map: "willList")
+  @@fulltext([originalName], map: "originalName")
+  @@fulltext([otherName], map: "otherName")
+}
+
+model ln_author {
+  authorID Int
+  lnID     Int
+  author   author @relation(fields: [authorID], references: [id], onDelete: Cascade, map: "FK_author_ln")
+  ln       ln     @relation(fields: [lnID], references: [id], onDelete: Cascade, map: "FK_ln_author")
+
+  @@id([lnID, authorID])
+  @@index([authorID], map: "FK_author_ln")
+}
+
+model ln_couple {
+  coupleID Int
+  lnID     Int
+  ln       ln     @relation(fields: [lnID], references: [id], onDelete: Cascade, map: "FK_couple_ln")
+  couple   couple @relation(fields: [coupleID], references: [id], onDelete: Cascade, map: "FK_ln_couple")
+
+  @@id([lnID, coupleID])
+  @@index([coupleID], map: "FK_ln_couple")
+}
+
+model ln_like {
+  userID   Int
+  lnID     Int
+  createAt DateTime @default(now()) @db.DateTime(0)
+  ln       ln       @relation(fields: [lnID], references: [id], onDelete: Cascade, map: "FK_ln")
+  user     User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_ln_like_user")
+
+  @@id([userID, lnID])
+  @@index([lnID], map: "FK_ln")
+}
+
+model ln_origin {
+  originID Int
+  lnID     Int
+  origin   origin @relation(fields: [originID], references: [id], onDelete: Cascade, map: "FK_ln_origin")
+  ln       ln     @relation(fields: [lnID], references: [id], onDelete: Cascade, map: "FK_origin_ln")
+
+  @@id([lnID, originID])
+  @@index([originID], map: "FK_ln_origin")
+}
+
+model ln_report {
+  id        Int      @id @default(autoincrement())
+  chapterID Int
+  lnID      Int
+  createAt  DateTime @default(now()) @db.DateTime(0)
+  type      Int      @db.TinyInt
+  detail    String?  @db.LongText
+  ln        ln       @relation(fields: [lnID], references: [id], onDelete: Cascade, map: "FK_ln_report")
+
+  @@index([chapterID], map: "FK_chapter_report")
+  @@index([lnID], map: "FK_ln_report")
+  @@index([createAt], map: "createAt")
+}
+
+model ln_subscribe {
+  userID   Int
+  lnID     Int
+  createAt DateTime @default(now()) @db.DateTime(0)
+  user     User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_ln_user")
+  ln       ln       @relation(fields: [lnID], references: [id], onDelete: Cascade, map: "FK_user_ln")
+
+  @@id([userID, lnID])
+  @@index([lnID], map: "FK_user_ln")
+}
+
+model ln_tag {
+  tagID Int
+  lnID  Int
+  tag   tag @relation(fields: [tagID], references: [id], onDelete: Cascade, map: "FK_ln_tag")
+  ln    ln  @relation(fields: [lnID], references: [id], onDelete: Cascade, map: "FK_tag_ln")
+
+  @@id([tagID, lnID])
+  @@index([lnID], map: "FK_tag_ln")
+}
+
+model ln_team {
+  lnID   Int
+  teamID Int
+  team   team @relation(fields: [teamID], references: [id], onDelete: Cascade, map: "FK_ln_team")
+  ln     ln   @relation(fields: [lnID], references: [id], onDelete: Cascade, map: "FK_team_ln")
+
+  @@id([lnID, teamID])
+  @@index([teamID], map: "FK_ln_team")
+}
+
+model log_process_server {
+  id          Int      @id @default(autoincrement())
+  description String   @db.VarChar(50)
+  time        DateTime @default(now()) @db.DateTime(0)
+  param       String?  @db.VarChar(50)
+}
+
+model log_report_error {
+  ID        Int      @id @default(autoincrement())
+  chapterID Int
+  mangaID   Int
+  createAt  DateTime @default(now()) @db.DateTime(0)
+  type      Int      @db.TinyInt
+  detail    String?  @db.LongText
+}
+
+model manga {
+  id              Int               @id @default(autoincrement())
+  originalName    String            @db.LongText
+  otherName       String            @db.LongText
+  releaseTime     DateTime          @default(now()) @db.DateTime(0)
+  description     String            @db.LongText
+  status          Int               @default(1) @db.TinyInt
+  thumbnail       String?           @db.Text
+  type            String?           @db.VarChar(15)
+  lastUpdate      DateTime?         @default(now()) @db.DateTime(0)
+  weeklyView      Int               @default(0) @db.UnsignedInt
+  monthlyView     Int               @default(0) @db.UnsignedInt
+  dailyView       Int               @default(0) @db.UnsignedInt
+  totalFollow     Int               @default(0) @db.UnsignedInt
+  lastChapter     Int?
+  totalView       Int               @default(0) @db.UnsignedInt
+  totalChapter    Int               @default(0)
+  likeCount       Int               @default(0) @db.UnsignedInt
+  followList      Int               @default(0) @db.UnsignedInt
+  doneList        Int               @default(0) @db.UnsignedInt
+  willList        Int               @default(0) @db.UnsignedInt
+  stopList        Int               @default(0) @db.UnsignedInt
+  chapter         chapter[]
+  comment         comment[]
+  follow          follow[]
+  history         history[]
+  list            list[]
+  manga_author    manga_author[]
+  manga_couple    manga_couple[]
+  manga_like      manga_like[]
+  manga_origin    manga_origin[]
+  manga_subscribe manga_subscribe[]
+  manga_tag       manga_tag[]
+  manga_team      manga_team[]
+  temp_comment    temp_comment[]
+  user_list       user_list[]
+
+  @@index([dailyView], map: "dailyView")
+  @@index([followList], map: "followList")
+  @@index([lastUpdate], map: "lastUpdate")
+  @@index([likeCount], map: "likeCount")
+  @@index([monthlyView], map: "monthlyView")
+  @@index([doneList], map: "readList")
+  @@index([status], map: "status")
+  @@index([stopList], map: "stopList")
+  @@index([totalFollow], map: "totalFollow")
+  @@index([totalView], map: "totalView")
+  @@index([weeklyView], map: "weeklyView")
+  @@index([willList], map: "willList")
+  @@fulltext([originalName], map: "originalName")
+  @@fulltext([otherName], map: "otherName")
+}
+
+model manga_author {
+  authorID Int
+  mangaID  Int
+  author   author @relation(fields: [authorID], references: [id], onDelete: Cascade, map: "FK_author")
+  manga    manga  @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK_author_manga")
+
+  @@id([authorID, mangaID])
+  @@index([mangaID], map: "FK_author_manga")
+}
+
+model manga_couple {
+  coupleID Int
+  mangaID  Int
+  couple   couple @relation(fields: [coupleID], references: [id], onDelete: Cascade, map: "FK_couple")
+  manga    manga  @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK_couple_manga")
+
+  @@id([coupleID, mangaID])
+  @@index([mangaID], map: "FK_couple_manga")
+}
+
+model manga_like {
+  userID   Int
+  mangaID  Int
+  createAt DateTime @default(now()) @db.DateTime(0)
+  manga    manga    @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK_manga_user")
+  user     User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_user_manga")
+
+  @@id([userID, mangaID])
+  @@index([mangaID], map: "FK_manga_user")
+  @@index([userID], map: "userID")
+}
+
+model manga_origin {
+  mangaID  Int
+  originID Int
+  manga    manga @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK_origin_manga")
+
+  @@id([mangaID, originID])
+  @@index([originID], map: "FK_manga_origin")
+}
+
+model manga_subscribe {
+  userID   Int
+  mangaID  Int
+  createAt DateTime @default(now()) @db.DateTime(0)
+  user     User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_sub_manga_user")
+  manga    manga    @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK_sub_user_manga")
+
+  @@id([userID, mangaID])
+  @@index([mangaID], map: "FK_sub_user_manga")
+}
+
+model manga_tag {
+  tagID   Int
+  mangaID Int
+  tag     tag   @relation(fields: [tagID], references: [id], onDelete: Cascade, map: "FK_manga_tag")
+  manga   manga @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK_tag_manga")
+
+  @@id([tagID, mangaID])
+  @@unique([tagID, mangaID], map: "tagID")
+  @@index([mangaID], map: "FK_tag_manga")
+}
+
+model manga_team {
+  mangaID Int
+  teamID  Int
+  manga   manga @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK_mt_manga")
+  team    team  @relation(fields: [teamID], references: [id], onUpdate: Restrict, map: "FK_mt_team")
+
+  @@id([mangaID, teamID])
+  @@unique([mangaID, teamID], map: "mangaID")
+  @@index([teamID], map: "FK_mt_team")
+}
+
+model notification {
+  id                Int                 @id @default(autoincrement())
+  title             String              @db.TinyText
+  body              String              @db.TinyText
+  url               String?             @db.TinyText
+  type              String              @db.VarChar(30)
+  objectID          Int?
+  senderID          Int?
+  thumbnail         String              @db.TinyText
+  icon              String?             @db.TinyText
+  counter           Int                 @default(1)
+  createAt          DateTime            @default(now()) @db.DateTime(0)
+  user_notification user_notification[]
+
+  @@index([createAt], map: "createAt")
+  @@index([type, objectID, createAt], map: "type")
+}
+
+model notification_template {
+  type     String @id @db.VarChar(30)
+  template String @db.Text
+}
+
+model origin {
+  id          Int         @id @default(autoincrement())
+  name        String      @db.TinyText
+  url         String      @db.TinyText
+  description String      @db.Text
+  ln_origin   ln_origin[]
+
+  @@index([url(length: 255)], map: "IDX_url_origin")
+}
+
+model payment {
+  id       Int      @id @default(autoincrement())
+  userID   Int
+  money    Int
+  createAt DateTime @default(now()) @db.DateTime(0)
+  status   Int      @db.TinyInt
+  method   String   @db.TinyText
+  user     User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_pay_user")
+
+  @@index([userID], map: "FK_pay_user")
+}
+
+model popup {
+  ID       Int      @id @default(autoincrement())
+  content  String   @db.LongText
+  createAt DateTime @db.DateTime(0)
+  isShow   Boolean
+}
+
+model premium_price {
+  id        Int     @id
+  name      String  @db.TinyText
+  month     Int
+  price     Int
+  thumbnail String? @db.TinyText
+}
+
+model rating {
+  ID      Int @id @default(autoincrement())
+  mangaID Int
+  userID  Int
+  star    Int @db.TinyInt
+}
+
+model tag {
+  id          Int         @id @default(autoincrement())
+  name        String      @db.TinyText
+  url         String      @db.TinyText
+  description String?     @db.Text
+  blacklist   blacklist[]
+  ln_tag      ln_tag[]
+  manga_tag   manga_tag[]
+}
+
+model team {
+  id             Int              @id @default(autoincrement())
+  name           String           @db.TinyText
+  description    String           @db.Text
+  createAt       DateTime?        @default(now()) @db.DateTime(0)
+  isActive       Boolean?         @default(false)
+  url            String           @db.TinyText
+  avatar         String           @default("images/team.jpeg") @db.TinyText
+  cover          String           @default("cover/team.jpeg") @db.TinyText
+  followCount    Int              @default(0) @db.UnsignedInt
+  ln_team        ln_team[]
+  manga_team     manga_team[]
+  team_follow    team_follow[]
+  team_subscribe team_subscribe[]
+  user           User[]
+
+  @@index([url(length: 255)], map: "IDX_url_team")
+}
+
+model team_follow {
+  userID   Int
+  teamID   Int
+  createAt DateTime @default(now()) @db.DateTime(0)
+  team     team     @relation(fields: [teamID], references: [id], onDelete: Cascade, map: "FK_tf_team")
+  user     User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_tf_user")
+
+  @@id([userID, teamID])
+  @@index([teamID], map: "FK_tf_team")
+  @@index([createAt], map: "createAt")
+  @@index([userID], map: "userID")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by the Prisma Client.
+model team_social {
+  teamID Int
+  type   String @db.VarChar(15)
+  link   String @db.Text
+  id     Int?
+
+  @@index([teamID], map: "teamID")
+  @@index([type], map: "type")
+  @@ignore
+}
+
+model team_subscribe {
+  userID   Int
+  teamID   Int
+  createAt DateTime @default(now()) @db.DateTime(0)
+  team     team     @relation(fields: [teamID], references: [id], onDelete: Cascade, map: "FK_ts_team")
+  user     User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_ts_user")
+
+  @@id([userID, teamID])
+  @@index([teamID], map: "FK_ts_team")
+}
+
+model temp {
+  id       Int      @id @default(autoincrement())
+  path     String   @db.Text
+  createAt DateTime @db.DateTime(0)
+
+  @@index([createAt], map: "createAt")
+  @@index([path(length: 256)], map: "path")
+}
+
+model temp_comment {
+  id                                 Int                           @id @default(autoincrement())
+  mangaID                            Int
+  chapterID                          Int?
+  path                               String                        @default("/") @db.VarChar(256)
+  content                            String?                       @db.Text
+  replyID                            Int?
+  createAt                           DateTime                      @default(now()) @db.DateTime(0)
+  userID                             Int
+  image                              String?                       @db.TinyText
+  likeCount                          Int                           @default(0)
+  replyCount                         Int                           @default(0)
+  pinCreator                         Int?
+  pinCreateAt                        DateTime?                     @db.DateTime(0)
+  chapter                            chapter?                      @relation(fields: [chapterID], references: [id], onDelete: Cascade, map: "FK_temp_chapter")
+  manga                              manga                         @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK_temp_manga")
+  temp_comment                       temp_comment?                 @relation("temp_commentTotemp_comment", fields: [replyID], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "FK_temp_parent")
+  user_temp_comment_pinCreatorTouser User?                         @relation("temp_comment_pinCreatorTouser", fields: [pinCreator], references: [mId], onUpdate: SetNull, map: "FK_temp_pin_user")
+  user_temp_comment_userIDTouser     User                          @relation("temp_comment_userIDTouser", fields: [userID], references: [mId], onDelete: Cascade, map: "FK_temp_user")
+  other_temp_comment                 temp_comment[]                @relation("temp_commentTotemp_comment")
+  temp_comment_like                  temp_comment_like[]
+  temp_comment_reaction_count        temp_comment_reaction_count[]
+
+  @@index([mangaID], map: "FK_temp_manga")
+  @@index([userID], map: "FK_temp_user")
+  @@index([chapterID], map: "chapterID")
+  @@index([createAt], map: "createAt")
+  @@index([pinCreator], map: "pinCreator")
+  @@index([replyID], map: "replyID")
+  @@fulltext([path], map: "IDX__comment_matPath")
+}
+
+model temp_comment_like {
+  userID       Int
+  commentID    Int
+  type         String       @default("like") @db.TinyText
+  createAt     DateTime     @default(now()) @db.DateTime(0)
+  temp_comment temp_comment @relation(fields: [commentID], references: [id], onDelete: Cascade, map: "temp_comment_like_temp_comment_id_fk")
+  user         User         @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "temp_comment_like_user_id_fk")
+
+  @@id([userID, commentID])
+  @@index([commentID], map: "temp_comment_like_temp_comment_id_fk")
+  @@fulltext([type], map: "IDX_comment_like_type")
+}
+
+model temp_comment_reaction_count {
+  commentID     Int
+  type          String       @db.VarChar(7)
+  reactionCount Int          @default(1)
+  temp_comment  temp_comment @relation(fields: [commentID], references: [id], onDelete: Cascade, map: "temp_comment_reaction_count_temp_comment_id_fk")
+
+  @@id([commentID, type])
+}
+
+model test {
+  userID         Int
+  notificationID Int
+  isView         Boolean @default(false)
+  isRead         Int     @default(0) @db.TinyInt
+
+  @@id([userID, notificationID])
+  @@index([notificationID], map: "FK_noti_parent")
+}
+
+model User {
+  mId                                        Int                 @id @default(autoincrement()) @map("id")
+  mEmail                                     String              @unique(map: "user_email_uindex") @map("email") @db.VarChar(100)
+  mPassword                                  String              @map("password") @db.MediumText
+  mPhone                                     String?             @map("phone") @db.MediumText
+  mGender                                    Int?                @map("gender") @db.UnsignedTinyInt
+  mRole                                      Int                 @default(1) @map("role") @db.UnsignedTinyInt
+  mTeamId                                    Int?                @default(1) @map("teamID")
+  mFacebook                                  String?             @map("facebook") @db.TinyText
+  mAccessToken                               String?             @map("accessToken") @db.VarChar(500)
+  mLastLogin                                 DateTime            @default(now()) @map("lastLogin") @db.DateTime(0)
+  mCreateAt                                  DateTime            @default(now()) @map("createAt") @db.DateTime(0)
+  follow                                     String?             @db.LongText
+  mPasswordResetToken                        String?             @map("passwordResetToken") @db.Text
+  mResetPasswordExpired                      DateTime?           @map("resetPasswordExpired") @db.DateTime(0)
+  mAvatar                                    String?             @default("images/defaultAvatar.png") @map("avatar") @db.VarChar(60)
+  mBannedTime                                DateTime?           @default(now()) @map("bannedTime") @db.DateTime(0)
+  mMoney                                     Int?                @default(0) @map("money")
+  mIsBanned                                  Boolean?            @default(false) @map("isBanned")
+  mPremiumTime                               DateTime?           @default(dbgenerated("('2022-02-04 00:00:00')")) @map("premiumTime") @db.DateTime(0)
+  mIsGrid                                    Boolean             @default(false) @map("isGrid")
+  mIsDarkmodeOn                              Boolean             @default(false) @map("isDarkmodeOn")
+  mUsername                                  String              @unique(length: 50, map: "IDX_username") @map("username") @db.TinyText
+  mConfirmed                                 Boolean             @default(false) @map("confirmed")
+  mConfirmToken                              String?             @map("confirmToken") @db.MediumText
+  mName                                      String              @map("name") @db.Text
+  mCover                                     String              @default("cover/profile.jpeg") @map("cover") @db.VarChar(70)
+  mShortBio                                  String?             @map("shortBio") @db.Text
+  mDob                                       DateTime            @default(dbgenerated("('2000-01-01')")) @map("dob") @db.Date
+  mPlaceOfBirth                              String?             @map("place_of_birth") @db.Text
+  mLove                                      String?             @map("love") @db.Text
+  mBio                                       String?             @map("bio") @db.Text
+  team                                       team?               @relation(fields: [mTeamId], references: [id], onDelete: Restrict, map: "FK_user_team")
+  blacklist                                  blacklist?
+  chapter_like                               chapter_like[]
+  comment_comment_pinCreatorTouser           comment[]           @relation("comment_pinCreatorTouser")
+  comment_comment_userIDTouser               comment[]           @relation("comment_userIDTouser")
+  comment_like                               comment_like[]
+  follow_followTouser                        follow[]
+  history_ln                                 history_ln[]
+  list                                       list[]
+  ln_like                                    ln_like[]
+  ln_subscribe                               ln_subscribe[]
+  manga_like                                 manga_like[]
+  manga_subscribe                            manga_subscribe[]
+  payment                                    payment[]
+  team_follow                                team_follow[]
+  team_subscribe                             team_subscribe[]
+  temp_comment_temp_comment_pinCreatorTouser temp_comment[]      @relation("temp_comment_pinCreatorTouser")
+  temp_comment_temp_comment_userIDTouser     temp_comment[]      @relation("temp_comment_userIDTouser")
+  temp_comment_like                          temp_comment_like[]
+  user_ban_userTouser_ban_createdBy          user_ban[]          @relation("userTouser_ban_createdBy")
+  user_ban_userTouser_ban_userID             user_ban[]          @relation("userTouser_ban_userID")
+  user_list                                  user_list[]
+  user_list_ln                               user_list_ln[]
+  user_notification                          user_notification[]
+  user_push                                  user_push[]
+
+  @@index([mTeamId], map: "FK_user_team")
+  @@index([mUsername(length: 50)], map: "IDX_usernamee")
+  @@index([mConfirmToken(length: 300)], map: "confirmToken")
+  @@index([mFacebook(length: 100)], map: "facebook")
+  @@index([mPasswordResetToken(length: 256)], map: "passwordResetToken")
+  @@fulltext([mName], map: "name")
+  @@map("user")
+}
+
+model user_ban {
+  userID                        Int
+  reason                        String   @db.TinyText
+  expireAt                      DateTime @db.DateTime(0)
+  createdBy                     Int
+  status                        String   @default("ACTIVE") @db.TinyText
+  createdAt                     DateTime @default(now()) @db.DateTime(0)
+  user_userTouser_ban_createdBy User     @relation("userTouser_ban_createdBy", fields: [createdBy], references: [mId], onUpdate: Restrict, map: "FK_ban_user_creator")
+  user_userTouser_ban_userID    User     @relation("userTouser_ban_userID", fields: [userID], references: [mId], onDelete: Cascade, map: "FK_ban_user_target")
+
+  @@id([userID, expireAt])
+  @@index([createdBy], map: "FK_ban_user_creator")
+  @@index([createdAt], map: "createdAt")
+}
+
+model user_config {
+  userID       Int     @id
+  manga        Boolean @default(true)
+  team         Boolean @default(true)
+  comment      Boolean @default(true)
+  web          Boolean @default(true)
+  comment_team Boolean @default(true)
+  comment_like Boolean @default(true)
+  report_team  Boolean @default(true)
+}
+
+model user_list {
+  userID   Int
+  mangaID  Int
+  listKey  Int
+  createAt DateTime @default(now()) @db.DateTime(0)
+  yurilist yurilist @relation(fields: [listKey], references: [id], onDelete: Cascade, map: "FK_ul_list")
+  manga    manga    @relation(fields: [mangaID], references: [id], onDelete: Cascade, map: "FK_ul_manga")
+  user     User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_ul_user")
+
+  @@id([userID, mangaID])
+  @@index([listKey], map: "FK_ul_list")
+  @@index([mangaID], map: "FK_ul_manga")
+}
+
+model user_list_ln {
+  userID   Int
+  lnID     Int
+  listKey  Int
+  createAt DateTime @default(now()) @db.DateTime(0)
+  yurilist yurilist @relation(fields: [listKey], references: [id], onUpdate: Restrict, map: "FK_listKey")
+  ln       ln       @relation(fields: [lnID], references: [id], onDelete: Cascade, map: "FK_ln_list")
+  user     User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_user")
+
+  @@id([userID, lnID])
+  @@index([listKey], map: "FK_listKey")
+  @@index([lnID], map: "FK_ln_list")
+}
+
+model user_notification {
+  userID         Int
+  notificationID Int
+  isView         Boolean      @default(false)
+  isRead         Int          @default(0) @db.TinyInt
+  notification   notification @relation(fields: [notificationID], references: [id], onDelete: Cascade, map: "FK_noti_parent")
+  user           User         @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_noti_user")
+
+  @@id([userID, notificationID])
+  @@index([notificationID], map: "FK_noti_parent")
+}
+
+model user_push {
+  id       Int      @id @default(autoincrement())
+  userID   Int
+  pushData String   @db.Text
+  createAt DateTime @default(now()) @db.DateTime(0)
+  user     User     @relation(fields: [userID], references: [mId], onDelete: Cascade, map: "FK_up_user")
+
+  @@index([userID], map: "FK_up_user")
+}
+
+model yurilist {
+  id           Int            @id
+  name         String         @db.TinyText
+  listKey      String         @db.TinyText
+  user_list    user_list[]
+  user_list_ln user_list_ln[]
+}

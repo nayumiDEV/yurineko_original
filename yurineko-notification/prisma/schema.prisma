@@ -1,0 +1,52 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["interactiveTransactions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model UserNotificationCounter {
+  mUserId  Int @id @map("m_user_id")
+  mCounter Int @default(1) @map("m_counter")
+
+  @@map("user_notification_counter")
+}
+
+model EventCounter {
+  mId            String   @map("m_id")
+  mLastEmittedAt DateTime @default(now()) @updatedAt @map("m_last_emitted_at")
+
+  mCounter Int @default(0) @map("m_counter")
+
+  @@id([mId])
+  @@index([mLastEmittedAt])
+  @@map("event_counter")
+}
+
+model Notification {
+  mUserId Int    @map("m_user_id")
+  mId     String @map("m_id")
+  mTitle  String @map("m_title")
+  mBody   String @map("m_body")
+  mType   String @map("m_type")
+  mIcon   String @map("m_icon")
+  mImage  String @map("m_image")
+  mUrl    String @map("m_url")
+
+  mIsRead Boolean @default(false) @map("m_is_read")
+  mIsView Boolean @default(false) @map("m_is_view")
+
+  mObjectId Int? @map("m_object_id")
+  mSenderId Int? @map("m_sender_id")
+
+  mCreatedAt DateTime @default(now()) @updatedAt @map("m_created_at")
+
+  @@id([mUserId, mId])
+  @@index([mUserId, mIsRead])
+  @@index([mUserId, mIsView])
+  @@index([mType, mObjectId, mCreatedAt, mIsView])
+  @@map("notification")
+}

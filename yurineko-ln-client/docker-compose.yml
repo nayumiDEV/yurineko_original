@@ -1,0 +1,23 @@
+version: '2.3'
+services:
+  nextjs:
+    build: ./
+    ports:
+      - 3004:3000
+  # nginx:
+  #   build: ./nginx
+  #   restart: always
+  #   volumes:
+  #     - ./certbot/conf:/etc/nginx/ssl
+  #     - ./certbot/data:/var/www/certbot
+  #     - ./html:/var/www/html
+  #   ports:
+  #     - 80:80
+  #     - 443:443
+  # certbot:
+  #       image: certbot/certbot:latest
+  #       command: certonly --webroot --webroot-path=/var/www/certbot --email luffy3qvietnam@gmail.com --agree-tos --no-eff-email -d client.yurineko.moe -d www.client.yurineko.moe
+  #       volumes:
+  #           - ./certbot/conf:/etc/letsencrypt
+  #           - ./certbot/logs:/var/log/letsencrypt
+  #           - ./certbot/data:/var/www/certbot

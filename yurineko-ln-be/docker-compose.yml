@@ -1,0 +1,25 @@
+version: "3"
+
+services:
+  yurineko-ln-be:
+    build: .
+    image: yurineko-ln-be
+    ports:
+      - '3002:8081'
+    volumes:
+      - .:/usr/src/yurineko-ln-be
+      - ~/yuri-storage/public/ln_comment:/usr/src/node-app/src/storage/ln_comment
+      - ~/yuri-storage/public/storage:/usr/src/node-app/src/storage/storage
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/etc/timezone:/etc/timezone:ro"
+    networks:
+      - ln-network
+    environment:
+      TZ: "Asia/Ho_Chi_Minh"
+
+volumes:
+  dbdata:
+
+networks:
+  ln-network:
+    driver: bridge

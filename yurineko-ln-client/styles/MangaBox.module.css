@@ -1,0 +1,9 @@
+.mangaBox {
+    /* width: 200px; */
+    height: 240px;
+    max-width: 200px;
+    max-height: 250px;
+    display: flex !important;
+    align-items: flex-end;
+    overflow: hidden;
+}

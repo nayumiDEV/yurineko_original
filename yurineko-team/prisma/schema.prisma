@@ -1,0 +1,90 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Team {
+  mId          Int       @id @default(autoincrement()) @map("id")
+  mName        String    @unique @map("name")
+  mDescription String    @default("") @map("description")
+  mAvatar      String?   @map("avatar")
+  mCover       String?   @map("cover")
+  mIsActive    Boolean   @default(true) @map("is_active")
+  mSlug        String    @unique @map("slug") @db.VarChar(255)
+  mSocialLinks Json?     @default("[]") @map("social_links")
+  mCreatedAt   DateTime  @default(now()) @map("created_at")
+  mModifiedAt  DateTime? @map("modified_at")
+  mFollowCount Int       @default(0) @map("follow_count")
+
+  relatedMorph TeamRelatedMorph[]
+  teamMembers  TeamMember[]
+  subscribers  TeamSubscriber[]
+  TeamFollow   TeamFollow[]
+
+  @@map("team")
+}
+
+model TeamMember {
+  mTeamId           Int     @map("team_id")
+  mMemberId         Int     @unique @map("member_id")
+  pCanCreateManga   Boolean @default(true) @map("p_can_create_manga")
+  pCanEditManga     Boolean @default(true) @map("p_can_edit_manga")
+  pCanDeleteManga   Boolean @default(true) @map("p_can_delete_manga")
+  pCanCreateChapter Boolean @default(true) @map("p_can_create_chapter")
+  pCanEditChapter   Boolean @default(true) @map("p_can_edit_chapter")
+  pCanDeleteChapter Boolean @default(true) @map("p_can_delete_chapter")
+  pCanManageTeam    Boolean @default(true) @map("p_can_manage_team")
+
+  team Team @relation(fields: [mTeamId], references: [mId], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([mTeamId, mMemberId])
+  @@index([mMemberId])
+  @@map("team_member")
+}
+
+model TeamRelatedMorph {
+  mTeamId      Int      @map("team_id")
+  mRelatedType String   @map("related_type")
+  mRelatedId   Int      @map("related_id")
+  mModifiedAt  DateTime @updatedAt @map("modified_at")
+  mCreatedAt   DateTime @default(now()) @map("created_at")
+
+  team Team @relation(fields: [mTeamId], references: [mId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([mTeamId, mRelatedType, mRelatedId])
+  @@unique([mRelatedType, mRelatedId])
+  @@map("team_related_morph")
+}
+
+model TeamFollow {
+  mUserId    Int      @map("user_id")
+  mTeamId    Int      @map("team_id")
+  mCreatedAt DateTime @default(now()) @map("created_at")
+
+  team Team @relation(fields: [mTeamId], references: [mId], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([mUserId, mTeamId])
+  @@index([mTeamId])
+  @@index([mUserId, mCreatedAt])
+  @@map("team_follow")
+}
+
+model TeamSubscriber {
+  mTeamId    Int      @map("team_id")
+  mUserId    Int      @map("user_id")
+  mCreatedAt DateTime @default(now()) @map("created_at")
+
+  team Team @relation(fields: [mTeamId], references: [mId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([mTeamId, mUserId])
+  @@index([mUserId, mTeamId])
+  @@map("team_subscriber")
+}
